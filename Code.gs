@@ -37,6 +37,7 @@ function initiateResumableUpload_(req) {
       payload: JSON.stringify(metadata),
       headers: {
         Authorization: 'Bearer ' + ScriptApp.getOAuthToken(),
+        Origin: 'https://mariostoump.github.io',
         'X-Upload-Content-Type': req.mimeType || 'application/octet-stream',
         'X-Upload-Content-Length': String(req.size || 0),
       },
