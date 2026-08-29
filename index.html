@@ -222,13 +222,22 @@ async function uploadOne(item, uploader) {
   while (offset < f.size) {
     const end = Math.min(offset + CHUNK, f.size);
     const blob = f.slice(offset, end);
-    const res = await fetch(init.uploadUrl, {
-      method: 'PUT',
-      headers: {
-        'Content-Range': 'bytes ' + offset + '-' + (end - 1) + '/' + f.size
-      },
-      body: blob
-    });
+    const isLast = end >= f.size;
+    let res;
+    try {
+      res = await fetch(init.uploadUrl, {
+        method: 'PUT',
+        headers: {
+          'Content-Range': 'bytes ' + offset + '-' + (end - 1) + '/' + f.size
+        },
+        body: blob
+      });
+    } catch (err) {
+      // Google's final 200 response omits CORS headers, so the browser
+      // cannot read it and fetch throws even though the upload succeeded.
+      if (isLast) { offset = end; bar.style.width = '100%'; return; }
+      throw err;
+    }
     if (res.status !== 308 && !res.ok) {
       throw new Error('chunk upload failed: ' + res.status);
     }
