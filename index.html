@@ -1,0 +1,241 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Marios &amp; Wedding — Share Your Photos &amp; Videos</title>
+<style>
+  :root {
+    --gold: #b08d57;
+    --gold-light: #d4b483;
+    --ink: #3a3a3a;
+    --bg: #faf7f2;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: Georgia, 'Times New Roman', serif;
+    background: var(--bg);
+    color: var(--ink);
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 24px 16px 48px;
+  }
+  .heart { color: var(--gold); font-size: 2rem; }
+  h1 {
+    font-size: 1.9rem;
+    font-weight: normal;
+    text-align: center;
+    margin: 8px 0 4px;
+    letter-spacing: 1px;
+  }
+  .subtitle {
+    text-align: center;
+    color: #777;
+    font-style: italic;
+    margin-bottom: 28px;
+    max-width: 480px;
+    line-height: 1.5;
+  }
+  .card {
+    background: #fff;
+    border-radius: 16px;
+    box-shadow: 0 4px 24px rgba(0,0,0,.07);
+    padding: 28px 24px;
+    width: 100%;
+    max-width: 520px;
+  }
+  label { display: block; margin-bottom: 6px; font-size: .95rem; }
+  input[type=text] {
+    width: 100%;
+    padding: 12px;
+    border: 1px solid #ddd;
+    border-radius: 8px;
+    font-size: 1rem;
+    margin-bottom: 20px;
+    font-family: inherit;
+  }
+  #drop {
+    border: 2px dashed var(--gold-light);
+    border-radius: 12px;
+    padding: 36px 16px;
+    text-align: center;
+    cursor: pointer;
+    transition: background .15s;
+    color: #8a7a62;
+  }
+  #drop.dragover { background: #f5eee2; }
+  #drop .big { font-size: 2.2rem; }
+  #fileInput { display: none; }
+  .btn {
+    display: block;
+    width: 100%;
+    margin-top: 20px;
+    padding: 14px;
+    background: var(--gold);
+    color: #fff;
+    border: none;
+    border-radius: 10px;
+    font-size: 1.05rem;
+    font-family: inherit;
+    cursor: pointer;
+  }
+  .btn:disabled { background: #ccc; cursor: default; }
+  ul#list { list-style: none; margin-top: 16px; }
+  ul#list li {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 8px 4px;
+    border-bottom: 1px solid #f0eae0;
+    font-size: .92rem;
+    font-family: system-ui, sans-serif;
+  }
+  .name { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .bar {
+    width: 90px; height: 8px;
+    background: #eee; border-radius: 4px; overflow: hidden; flex-shrink: 0;
+  }
+  .bar > div { height: 100%; width: 0; background: var(--gold); transition: width .2s; }
+  .status { width: 24px; text-align: center; flex-shrink: 0; }
+  .done-msg {
+    margin-top: 18px;
+    text-align: center;
+    color: #2e7d32;
+    display: none;
+  }
+  footer { margin-top: 32px; color: #aaa; font-size: .85rem; text-align: center; }
+</style>
+</head>
+<body>
+  <div class="heart">&#10084;&#65039;</div>
+  <h1>Our Wedding Memories</h1>
+  <p class="subtitle">Thank you for celebrating with us! Please share the photos and videos you took — just add them below.</p>
+
+  <div class="card">
+    <label for="uploader">Your name (so we know who shared these)</label>
+    <input type="text" id="uploader" placeholder="e.g. Uncle Kostas" />
+
+    <div id="drop">
+      <div class="big">&#128247;</div>
+      <p><strong>Tap here</strong> to choose photos &amp; videos<br/>or drag &amp; drop them</p>
+    </div>
+    <input type="file" id="fileInput" multiple accept="image/*,video/*" />
+
+    <ul id="list"></ul>
+
+    <button class="btn" id="uploadBtn" disabled>Upload</button>
+    <p class="done-msg" id="doneMsg">&#10003; All done — thank you so much! You can add more anytime.</p>
+  </div>
+
+  <footer>Made with love &middot; files go straight to the couple</footer>
+
+<script>
+// Set this to your deployed Google Apps Script Web App URL:
+const BACKEND_URL = 'https://script.google.com/macros/s/AKfycbyftgcNL6bBgkjWlCHHgQHW6KtrWuWwNRN1MZzHOBf4cjpqotx4rmHaeZAuFjgaJZoR/exec';
+
+const drop = document.getElementById('drop');
+const fileInput = document.getElementById('fileInput');
+const list = document.getElementById('list');
+const uploadBtn = document.getElementById('uploadBtn');
+const doneMsg = document.getElementById('doneMsg');
+let queue = [];
+
+drop.addEventListener('click', () => fileInput.click());
+drop.addEventListener('dragover', e => { e.preventDefault(); drop.classList.add('dragover'); });
+drop.addEventListener('dragleave', () => drop.classList.remove('dragover'));
+drop.addEventListener('drop', e => {
+  e.preventDefault();
+  drop.classList.remove('dragover');
+  addFiles(e.dataTransfer.files);
+});
+fileInput.addEventListener('change', () => addFiles(fileInput.files));
+
+function addFiles(files) {
+  for (const f of files) {
+    const li = document.createElement('li');
+    li.innerHTML = '<span class="name"></span><div class="bar"><div></div></div><span class="status">&#8987;</span>';
+    li.querySelector('.name').textContent = f.name + ' (' + prettySize(f.size) + ')';
+    list.appendChild(li);
+    queue.push({ file: f, li });
+  }
+  if (queue.length) uploadBtn.disabled = false;
+  doneMsg.style.display = 'none';
+}
+
+function prettySize(n) {
+  if (n > 1e9) return (n / 1e9).toFixed(1) + ' GB';
+  if (n > 1e6) return (n / 1e6).toFixed(1) + ' MB';
+  return Math.round(n / 1e3) + ' KB';
+}
+
+uploadBtn.addEventListener('click', async () => {
+  uploadBtn.disabled = true;
+  uploadBtn.textContent = 'Uploading…';
+  const uploader = document.getElementById('uploader').value.trim();
+  const pending = queue;
+  queue = [];
+  let allOk = true;
+  for (const item of pending) {
+    try {
+      await uploadOne(item, uploader);
+      item.li.querySelector('.status').innerHTML = '&#9989;';
+    } catch (err) {
+      console.error(err);
+      allOk = false;
+      item.li.querySelector('.status').innerHTML = '&#10060;';
+      queue.push(item); // allow retry
+    }
+  }
+  uploadBtn.textContent = 'Upload';
+  if (queue.length) {
+    uploadBtn.disabled = false;
+    alert('Some files failed to upload — press Upload to retry them.');
+  } else if (allOk) {
+    doneMsg.style.display = 'block';
+  }
+});
+
+async function uploadOne(item, uploader) {
+  const f = item.file;
+  const bar = item.li.querySelector('.bar > div');
+  // 1) ask backend for a resumable upload URL
+  const initRes = await fetch(BACKEND_URL, {
+    method: 'POST',
+    // text/plain avoids a CORS preflight, which Apps Script doesn't support
+    headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+    body: JSON.stringify({
+      action: 'initiate',
+      filename: f.name,
+      mimeType: f.type || 'application/octet-stream',
+      size: f.size,
+      uploader: uploader
+    })
+  });
+  const init = await initRes.json();
+  if (!init.ok) throw new Error(init.error || 'init failed');
+
+  // 2) upload the file in chunks directly to Google Drive
+  const CHUNK = 8 * 1024 * 1024; // 8MB, must be multiple of 256KB
+  let offset = 0;
+  while (offset < f.size) {
+    const end = Math.min(offset + CHUNK, f.size);
+    const blob = f.slice(offset, end);
+    const res = await fetch(init.uploadUrl, {
+      method: 'PUT',
+      headers: {
+        'Content-Range': 'bytes ' + offset + '-' + (end - 1) + '/' + f.size
+      },
+      body: blob
+    });
+    if (res.status !== 308 && !res.ok) {
+      throw new Error('chunk upload failed: ' + res.status);
+    }
+    offset = end;
+    bar.style.width = Math.round(offset / f.size * 100) + '%';
+  }
+}
+</script>
+</body>
+</html>
